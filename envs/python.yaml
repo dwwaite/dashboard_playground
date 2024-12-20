@@ -1,0 +1,9 @@
+name: viro_server
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - plotly=5.24.1
+  - polars=1.14.0
+  - sqlalchemy=2.0.34
+  - streamlit=1.40.1
