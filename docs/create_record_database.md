@@ -103,7 +103,7 @@ from lib.sql_interface import DataInterface
 connection = DataInterface.open_connection('example.db')
 
 # Filter to only retain record tags from countries in the database
-accepted_codes = Country.select_all(connection).get_column('Code')
+accepted_codes = [c.code for c in Country.select_all(connection)]
 
 df = (
     pl
@@ -166,7 +166,7 @@ from lib.sql_geotag import GeoTag
 from lib.sql_interface import DataInterface
 
 connection = DataInterface.open_connection('example.db')
-accepted_codes = Country.select_all(connection).get_column('Code')
+accepted_codes = [c.code for c in Country.select_all(connection)]
 
 # Parse record table
 df = (
