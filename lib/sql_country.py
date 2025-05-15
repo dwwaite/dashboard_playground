@@ -1,4 +1,4 @@
-import polars as pl
+from typing import List
 from sqlalchemy import String
 from sqlalchemy import select
 from sqlalchemy.engine import Engine
@@ -19,7 +19,10 @@ class Country(BASE):
         return f"Country(code={self.code!r}, name={self.name!r})"
 
     def __eq__(self, other_country) -> bool:
-        return self.code == other_country.code and self.name == other_country.name
+        if type(other_country) == Country:
+            return self.code == other_country.code and self.name == other_country.name
+        else:
+            return False
 
     @staticmethod
     def create_record(engine: Engine, country_code: str, country_name: str) -> None:
@@ -43,7 +46,7 @@ class Country(BASE):
             session.commit()
 
     @staticmethod
-    def select_all(engine: Engine) -> pl.DataFrame:
+    def select_all(engine: Engine) -> List['Country']:
         """ Return a list of all Country records in the database, formatted as a polars
             DataFrame.
 
@@ -54,10 +57,7 @@ class Country(BASE):
         with Session(engine) as session:
             country_records = session.scalars(select(Country)).all()
 
-        return pl.DataFrame([
-            {'Code': record.code, 'Name': record.name}
-            for record in country_records
-        ])
+        return country_records
 
     @staticmethod
     def select_by_id(engine: Engine, country_id: str) -> 'Country':

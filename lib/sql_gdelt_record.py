@@ -1,12 +1,9 @@
-import polars as pl
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from sqlalchemy import ForeignKey, insert, select
-from sqlalchemy import Date, Float, Integer, String
+import polars as pl
+from sqlalchemy import Date, Float, ForeignKey, Integer, String, insert
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session, relationship
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from lib.sql_country import Country
 from lib.sql_geotag import GeoTag
@@ -157,7 +154,49 @@ class GdeltRecord(BASE):
             engine -- an object of type Engine referencing the current database
         """
 
-        with Session(engine) as session:
-            results = session.scalars(select(GdeltRecord)).all()
+        return (
+            pl
+            .read_database(
+                query="""
+                    SELECT date, source_id, target_id, cameo_code, num_events, num_arts, quad_class, goldstein, source_record_id, target_record_id, action_record_id
+                    FROM GDELT_RECORD
+                """,
+                connection=engine
+            )
+            .cast({'date': pl.Date})
+        )
 
-        return results
+    @staticmethod
+    def select_by_country(engine: Engine, source_country: Country, target_country: Country=None) -> pl.DataFrame:
+        """ Return a list of all GdeltRecord records in the database originating from the country
+            specified by the user. Optionally may also restrict to a target country of interest (i.e
+            articles from X, or articles from X about Y).
+
+            Results are captured as a polars DataFrame for ease of visualisation.
+
+            Arguments:
+            engine         -- an object of type Engine referencing the current database
+            source_country -- the country from which records originate
+            target_country -- the country which records the records are about
+        """
+
+        query_string = """
+            SELECT date, source_id, target_id, cameo_code, num_events, num_arts, quad_class, goldstein, source_record_id, target_record_id, action_record_id
+            FROM GDELT_RECORD
+            WHERE source_id == :source_country
+        """
+        query_params = {'source_country': source_country.code}
+
+        if target_country:
+            query_string += """ AND target_id == :target_country """
+            query_params['target_country'] = target_country.code
+
+        return (
+            pl
+            .read_database(
+                query=query_string,
+                connection=engine,
+                execute_options={'parameters': query_params}
+            )
+            .cast({'date': pl.Date})
+        )

@@ -1,9 +1,10 @@
 import unittest
 from datetime import date
+from typing import Any, Dict, List
 
 import polars as pl
 from polars.testing import assert_frame_equal
-from sqlalchemy import create_engine, insert, select
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from lib.sql_country import Country
@@ -13,6 +14,7 @@ from lib.sql_mapping import BASE
 
 DEFAULT_COUNTRY_1 = 'ABC'
 DEFAULT_COUNTRY_2 = 'DEF'
+DEFAULT_COUNTRY_3 = 'GHI'
 DEFAULT_GEOTAG_1 = -1
 DEFAULT_GEOTAG_2 = -1
 DEFAULT_GEOTAG_3 = -1
@@ -28,6 +30,7 @@ class TestGdeltRecord(unittest.TestCase):
         # Add two countries, for allowing FK links for new objects
         Country.create_record(self.engine, DEFAULT_COUNTRY_1, 'DEFAULT_COUNTRY_1')
         Country.create_record(self.engine, DEFAULT_COUNTRY_2, 'DEFAULT_COUNTRY_2')
+        Country.create_record(self.engine, DEFAULT_COUNTRY_3, 'DEFAULT_COUNTRY_3')
 
         # Add three GeoTag records, for allowing FK links for new objects
         DEFAULT_GEOTAG_1 = GeoTag.create_new_record(self.engine, 1, 2.0, 3.0)
@@ -158,7 +161,7 @@ class TestGdeltRecord(unittest.TestCase):
 
 #endregion
 
-#region Private functions
+#region Private static functions
 
     def test_resolve_country_entry_country(self):
         """ Tests the behaviour of the `_resolve_country_entry()` function when the data is
@@ -275,8 +278,120 @@ class TestGdeltRecord(unittest.TestCase):
 
 #region Select operations
  
-    @unittest.skip('TODO')
+    def gdelt_to_dict(self, gdelt) -> Dict[str, Any]:
+        """ A helper function to ease conversion between GdeltRecord and pl.DataFrame
+            data types. Only retrieves the values which are surfaced in the DataFrame
+            representation of the data.
+        """
+        attrs = [
+            'date', 'source_id', 'target_id',
+            'cameo_code', 'num_events', 'num_arts', 'quad_class', 'goldstein',
+            'source_record_id', 'target_record_id', 'action_record_id'
+        ]
+        return {attr: getattr(gdelt, attr) for attr in attrs}
+
+    def populate_test_database(self) -> List[GdeltRecord]:
+        """ Insert a predetermined number of entries into the test database
+            for validating select queries.
+        """
+
+        src_sequence = [DEFAULT_COUNTRY_1, DEFAULT_COUNTRY_1, DEFAULT_COUNTRY_2, DEFAULT_COUNTRY_3]
+        dest_sequence = [DEFAULT_COUNTRY_2, DEFAULT_COUNTRY_3, DEFAULT_COUNTRY_3, DEFAULT_COUNTRY_1]
+
+        record_buffer = []
+        for i in range(0, 4):
+            cameo = i + 1; arts = i + 2; events = i + 3; quad = i + 0.1
+            my_record = GdeltRecord(
+                date=date.today(),
+                source_id=src_sequence[i],
+                target_id=dest_sequence[i],
+                cameo_code=cameo,
+                num_events=events,
+                num_arts=arts,
+                quad_class=quad,
+            )
+
+            GdeltRecord.create_record(self.engine, date.today(), src_sequence[i], dest_sequence[i], cameo, events, arts, quad)
+            record_buffer.append(my_record)
+
+        return record_buffer
+
     def test_select_all(self):
-        pass
+        """ Test the behaviour of the `select_all()` function when there are records in the
+            database.
+        """
+
+        record_list = [self.gdelt_to_dict(x) for x in self.populate_test_database()]
+        exp_df = (
+            pl
+            .DataFrame(record_list)
+            .with_columns(
+                pl.Series('goldstein', [None] * 4),
+                pl.Series('source_record_id', [None] * 4),
+                pl.Series('target_record_id', [None] * 4),
+                pl.Series('action_record_id', [None] * 4),
+            )
+        )
+
+        obs_df = GdeltRecord.select_all(self.engine)
+        assert_frame_equal(exp_df, obs_df)
+
+    def test_select_all_empty(self):
+        """ Test the behaviour of the `select_all()` function when there are no records in the
+            database.
+        """
+
+        obs_df = GdeltRecord.select_all(self.engine)
+        self.assertTrue(obs_df.is_empty())
+
+    def test_select_by_country_source(self):
+        """ Test the behaviour of the `select_by_country()` function when there are matching source
+            records in the database.
+        """
+
+        record_list = self.populate_test_database()
+        src_country = Country.select_by_id(self.engine, DEFAULT_COUNTRY_1)
+
+        exp_df = (
+            pl
+            .DataFrame([self.gdelt_to_dict(record) for record in record_list])
+            .filter(pl.col('source_id').eq(DEFAULT_COUNTRY_1))
+        )
+
+        obs_df = GdeltRecord.select_by_country(self.engine, src_country)
+        assert_frame_equal(exp_df, obs_df)
+
+    def test_select_by_country_empty(self):
+        """ Test the behaviour of the `select_by_country()` function when there are no matching
+            query records in the database. This test is assumed to cover both source and
+            source/target queries.
+        """
+
+        _ = self.populate_test_database()
+        my_country = Country(code='---', name='Nowhere')
+
+        obs_df = GdeltRecord.select_by_country(self.engine, my_country)
+        self.assertTrue(obs_df.is_empty())
+
+    def test_select_by_country_source_target(self):
+        """ Test the behaviour of the `select_by_country()` function when there are matching source
+            and target records in the database.
+        """
+
+        record_list = self.populate_test_database()
+        src_country = Country.select_by_id(self.engine, DEFAULT_COUNTRY_1)
+        target_country = Country.select_by_id(self.engine, DEFAULT_COUNTRY_2)
+
+        exp_df = (
+            pl
+            .DataFrame([self.gdelt_to_dict(record) for record in record_list])
+            .filter(
+                pl.col('source_id').eq(DEFAULT_COUNTRY_1),
+                pl.col('target_id').eq(DEFAULT_COUNTRY_2)
+            )
+        )
+
+        obs_df = GdeltRecord.select_by_country(self.engine, src_country, target_country=target_country)
+        assert_frame_equal(exp_df, obs_df)
 
 #endregion

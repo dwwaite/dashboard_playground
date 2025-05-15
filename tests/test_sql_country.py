@@ -67,6 +67,7 @@ class TestCountry(unittest.TestCase):
         self.assertEqual(first_country, second_country)
         self.assertNotEqual(first_country, third_country)
         self.assertNotEqual(first_country, fourth_country)
+        self.assertNotEqual(first_country, None)
 
     def test_repr(self):
         """ Test the to-string behaviour for the Country class. """
@@ -113,17 +114,18 @@ class TestCountry(unittest.TestCase):
         """
 
         # Set the expected values and insert into the database
-        exp_records = pl.DataFrame([
-            pl.Series('Code', ['ABC', 'DEF', 'GHI']),
-            pl.Series('Name', ['name_1', 'name_2', 'name_3']),
-        ])
+        exp_records = [
+            Country(code='ABC', name='name_1'),
+            Country(code='DEF', name='name_2'),
+            Country(code='GHI', name='name_3'),
+        ]
 
-        for (code, name) in exp_records.iter_rows():
-            self.insert_country(code, name)
+        for country in exp_records:
+            self.insert_country(country.code, country.name)
 
         # Extract the database records and compare to the original inputs
         obs_records = Country.select_all(self.engine)
-        assert_frame_equal(exp_records, obs_records)
+        self.assertListEqual(exp_records, obs_records)
 
     def test_select_all_empty(self):
         """ Test the behaviour of the `select_all()` function when there are not entries in
@@ -131,7 +133,7 @@ class TestCountry(unittest.TestCase):
         """
 
         obs_records = Country.select_all(self.engine)
-        self.assertTrue(obs_records.is_empty())
+        self.assertListEqual([], obs_records)
 
     def test_select_by_id(self):
         """ Test the behaviour of the `select_by_id()` function when there is a match in the
