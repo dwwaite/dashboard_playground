@@ -1,0 +1,10 @@
+[server]
+port = 5051
+fileWatcherType = "none"
+
+[client]
+showSidebarNavigation = false
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
