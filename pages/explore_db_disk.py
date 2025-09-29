@@ -2,6 +2,7 @@ import polars as pl
 import streamlit as st
 from lib.sql_country import Country
 from lib.sql_gdelt_record import GdeltRecord
+from lib.polars_view import PolarsView
 
 from pages.ui_elements import init_session, render_sidebar
 from pages.ui_elements import format_column_areachart, format_column_progress
@@ -37,87 +38,86 @@ else:
     target_country = None
 
 if st.button('Import selection'):
-    df = GdeltRecord.select_by_country(st.session_state.db_connection, source_country, target_country=target_country)
 
-    st.session_state.min_date = df.get_column('date').min()
-    st.session_state.max_date = df.get_column('date').max()
-    st.session_state.max_events = df.get_column('num_events').sum()
-    st.session_state.explore_table = df
+    st.session_state.explore_table = GdeltRecord.select_by_country(
+        st.session_state.db_connection,
+        source_country,
+        target_country=target_country
+    )
 
 if not st.session_state.explore_table is None:
+
+    polars_view = PolarsView(st.session_state.explore_table)
+
+    (st.session_state.min_date, st.session_state.max_date) = polars_view.extract_data_spread('date')
+    st.session_state.max_events = polars_view.extract_data_total('num_events')
 
     with st.expander('Filter by dates'):
         col_start_date, col_end_date = st.columns(2)
 
-        min_date = st.session_state.min_date
-        max_date = st.session_state.max_date
-
         with col_start_date:
-            filt_start = st.date_input('Start date', min_value=min_date, max_value=max_date, value=min_date)
+            filt_start = st.date_input(
+                'Start date',
+                min_value=st.session_state.min_date,
+                max_value=st.session_state.max_date,
+                value=st.session_state.min_date
+            )
 
         with col_end_date:
-            filt_end = st.date_input('End date', min_value=min_date, max_value=max_date, value=max_date)
+            filt_end = st.date_input(
+                'End date',
+                min_value=st.session_state.min_date,
+                max_value=st.session_state.max_date,
+                value=st.session_state.max_date
+            )
 
     with st.expander('Aggregate data'):
 
         selection_rank = st.segmented_control('Level to aggregate', ['Year', 'Month', 'Day'])
 
-        agg_map = {'Minimum': pl.min, 'Maximum': pl.max, 'Count': pl.count, 'Total': pl.sum}
-        agg_options = st.pills('Summary options', options=agg_map.keys(), selection_mode='multi')
+        event_map = {'Minimum': pl.min, 'Maximum': pl.max, 'Count': pl.count, 'Total': pl.sum}
+        goldstein_map = {'Temporal variation': pl.implode}
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            event_options = st.pills('Event options', options=event_map.keys(), selection_mode='multi')
+
+        with col2:
+            goldstein_options = st.pills('Golstein options', options=goldstein_map.keys(), selection_mode='multi')
 
     # Begin filter and render routine
-    # Create a pl.LazyFrame() which can be manipulated in a builder-like pattern before collection
-    disp_lf = st.session_state.explore_table.lazy()
+    if filt_start != st.session_state.min_date:
+        polars_view.apply_filter_ge('date', filt_start)
 
-    if filt_start != min_date:
-        disp_lf = disp_lf.filter(pl.col('date').ge(filt_start))
+    if filt_end != st.session_state.max_date:
+        polars_view.apply_filter_le('date', filt_end)
 
-    if filt_end != max_date:
-        disp_lf = disp_lf.filter(pl.col('date').le(filt_end))
+    # If both a summary rank and aggregation options are selected, perform the grouping otherwise report raw
+    if selection_rank and event_options:
 
-    # If both a summary rank and aggregation options are selected, perform the grouping.
-    # Otherwise, report as raw data
-    if selection_rank and agg_options:
-
-        match selection_rank:
-            case 'Year':
-                disp_lf = disp_lf.group_by_dynamic('date', every='1y')
-                disp_fmt = 'YYYY'
-            case 'Month':
-                disp_lf = disp_lf.group_by_dynamic('date', every='1m')
-                disp_fmt = 'YYYY MMMM'
-            case 'Day':
-                disp_lf = disp_lf.group_by_dynamic('date', every='1d')
-                disp_fmt = 'YYYY MMM DD'  
-
-        agg_exprs = []
+        disp_fmt = polars_view.apply_dynamic_date_grouping(selection_rank)
         config_map = {'date': st.column_config.DateColumn("Event date", format=disp_fmt)}
+        agg_exprs = []
 
-        def build_summary_expr(col_name, col_func):
-            col_label = f"{col_func.__name__}_{col_name}"
-            expr = col_func(col_name).alias(col_label)
-            return col_label, expr
+        # Iterate for num_events to keep the fields organised by their underlying data
+        for event_option in event_options:
+            col_label = polars_view.apply_aggregation_rule('num_events', event_map[event_option])
+            config_map[col_label] = format_column_progress(f"Number of events ({event_option})", st.session_state.max_events)
 
-        # Iterate for num_events, then Goldstein, to keep the fields organised by their underlying data
-        for agg_option in agg_options:
-            col_label, agg_expr = build_summary_expr('num_events', agg_map[agg_option])
-            agg_exprs.append(agg_expr)
-            config_map[col_label] = format_column_progress(f"Number of events ({agg_option})", st.session_state.max_events)
+        for goldstein_option in goldstein_options:
+            col_label = polars_view.apply_series_rule('goldstein')
+            config_map[col_label] = format_column_areachart(f"Goldstein Scale)")
 
-        for agg_option in agg_options:
-            col_label, agg_expr = build_summary_expr('goldstein', agg_map[agg_option])
-            agg_exprs.append(agg_expr)
-            config_map[col_label] = format_column_areachart(f"Goldstein Scale ({agg_option})")
-
-        disp_lf = disp_lf.agg(agg_exprs)
+        disp_lf = polars_view.resolve_view().lazy()
 
     else:
-        disp_fmt = 'YYYY MMM DD'
         config_map = {
-            'date': st.column_config.DateColumn("Event date", format=disp_fmt),
+            'date': st.column_config.DateColumn("Event date", format='YYYY MMM DD'),
             'num_events': format_column_progress('Number of events', st.session_state.max_events),
             'goldstein': format_column_areachart('Goldstein Scale'),
         }
+        disp_lf = polars_view._data_frame.lazy()
 
     st.data_editor(
         disp_lf.collect().sort('date'),

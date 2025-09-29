@@ -139,7 +139,7 @@ import polars as pl
 from lib.sql_interface import DataInterface
 
 def polars_sql(engine, source_country):
-    return(
+    return (
         pl
         .read_database(
             query="""
