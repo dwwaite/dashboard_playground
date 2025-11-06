@@ -30,7 +30,7 @@ class PolarsView():
         return (data_series.min(), data_series.max())
 
     def extract_data_total(self, col_name: str) -> int:
-        """ Extract the total number of entries in the specified numeric column of the
+        """ Extract the sum of all entries in the specified numeric column of the
             tracked pl.DataFrame.
 
             Arguments:
