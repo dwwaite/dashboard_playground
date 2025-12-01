@@ -227,7 +227,8 @@ df = (
     )
     .select(
         'date', 'source_id', 'target_id', 'cameo_code', 'num_events', 'num_arts', 'quad_class', 'goldstein',
-        'source_record_id', 'target_record_id', 'action_record_id')
+        'source_record_id', 'target_record_id', 'action_record_id',
+    )
 )
 
 # Insert record information

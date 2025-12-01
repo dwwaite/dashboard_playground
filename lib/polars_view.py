@@ -129,13 +129,14 @@ class PolarsView():
         self.validate_column_name(col_name)
 
         col_label = f"{col_name}_implode"
-
         sequence_expr = (
             pl
             .col(col_name)
-            .map_elements(lambda x: list(x), return_dtype=pl.List(dtype))
+            .cast(dtype)
+            .implode()
             .alias(col_label)
         )
+
         self._agg_expressions.append(sequence_expr)
 
         return col_label

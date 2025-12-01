@@ -33,8 +33,9 @@ def render_sidebar():
     with st.sidebar:
         st.markdown('---')
         st.markdown('## Select an activity')
-        st.page_link('pages/explore_db_disk.py', label='Table exploration')
-        st.page_link('pages/explore_db_memory.py', label='Table exploration (in-memory)')
+        st.page_link('pages/explore_country.py', label='Country exploration (table)')
+        st.page_link('pages/visualise_longitudinal.py', label='Country exploration (graphical)')
+        st.page_link('pages/visualise_spatial.py', label='Map projection of data')
 
 def render_filter_panel(session_state: st.session_state, polars_view: PolarsView) -> None:
     """ Draw an expandable control with filter toggles to apply to a user-specified PolarsView

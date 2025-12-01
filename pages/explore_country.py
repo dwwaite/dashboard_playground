@@ -57,6 +57,7 @@ if not st.session_state.explore_table is None:
     with st.expander('Aggregate data'):
 
         selection_rank = st.segmented_control('Level to aggregate', ['Year', 'Month', 'Day'])
+        st.markdown(":orange-badge[⚠️ Month aggregation needs review]")
 
         event_map = {'Minimum': pl.min, 'Maximum': pl.max, 'Count': pl.count, 'Total': pl.sum}
         goldstein_map = {'Temporal variation': pl.implode}
@@ -65,8 +66,6 @@ if not st.session_state.explore_table is None:
 
         with col1:
             event_options = st.pills('Event options', options=event_map.keys(), selection_mode='multi')
-            # v1.5.0
-            # #st.markdown(":orange-badge[⚠️ Month aggregation needs review]")
 
         with col2:
             goldstein_options = st.pills('Golstein options', options=goldstein_map.keys(), selection_mode='multi')
@@ -112,6 +111,5 @@ if not st.session_state.explore_table is None:
         disp_df.sort('date'),
         column_config=config_map,
         hide_index=True,
-        use_container_width=True,
-        #width='stretch', # For v1.5.0
+        width='stretch',
     )

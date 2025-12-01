@@ -15,6 +15,9 @@ class TestGeoTag(unittest.TestCase):
         self.engine = create_engine("sqlite+pysqlite:///:memory:", echo=False, future=True)
         BASE.metadata.create_all(self.engine)
 
+    def tearDown(self):
+        self.engine.dispose()
+
     def insert_geotag(self, geo_type: int, geo_lat: float, geo_long: float) -> None:
         """ Create a new record in the database without relying on the Country class. Uses the core approach rather
             than ORM to help troubleshoot errors in the Country class.

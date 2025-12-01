@@ -11,9 +11,11 @@ class TestCountry(unittest.TestCase):
     """ Unit test class for the lib.Country class """
 
     def setUp(self):
-
         self.engine = create_engine("sqlite+pysqlite:///:memory:", echo=False, future=True)
         BASE.metadata.create_all(self.engine)
+
+    def tearDown(self):
+        self.engine.dispose()
 
     def insert_country(self, country_code, country_name) -> None:
         """ Create a new record in the database without relying on the Country class. Uses the core approach rather

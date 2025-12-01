@@ -34,8 +34,11 @@ class TestGdeltRecord(unittest.TestCase):
 
         # Add three GeoTag records, for allowing FK links for new objects
         DEFAULT_GEOTAG_1 = GeoTag.create_new_record(self.engine, 1, 2.0, 3.0)
-        DEFAULT_GEOTAG_1 = GeoTag.create_new_record(self.engine, 4, 5.0, 6.0)
-        DEFAULT_GEOTAG_1 = GeoTag.create_new_record(self.engine, 7, 8.0, 9.0)
+        DEFAULT_GEOTAG_2 = GeoTag.create_new_record(self.engine, 4, 5.0, 6.0)
+        DEFAULT_GEOTAG_3 = GeoTag.create_new_record(self.engine, 7, 8.0, 9.0)
+
+    def tearDown(self):
+        self.engine.dispose()
 
     def select_record(self, record_id) -> GdeltRecord:
         """ An internal helper method to extract a specified record without going through the
@@ -119,6 +122,7 @@ class TestGdeltRecord(unittest.TestCase):
             cameo_code=2, num_events=3, num_arts=4, quad_class=5.0,
             source_record_id=6, target_record_id=7, action_record_id=8,
         )
+
         second_record = GdeltRecord(
             date=date_stamp, source_id=DEFAULT_COUNTRY_1, target_id=DEFAULT_COUNTRY_2,
             cameo_code=2, num_events=3, num_arts=4, quad_class=5.0,
@@ -270,9 +274,34 @@ class TestGdeltRecord(unittest.TestCase):
                 obs_record = self.select_record(i+1)
                 self.assertEqual(my_record, obs_record)
 
-    @unittest.skip('TODO')
     def test_create_mass_records(self):
-        pass
+        """ Test the behaviour of the `create_mass_records()` function when constructing multiple records in a
+            single operation.
+        """
+
+        date_stamp = date.today()
+
+        record_1 = {
+            'date': date_stamp,
+            'source_id': DEFAULT_COUNTRY_1,
+            'target_id': DEFAULT_COUNTRY_2,
+            'cameo_code': 1, 'num_events': 2, 'num_arts': 3, 'quad_class': 4,
+        }
+
+        record_2 = {
+            'date': date_stamp,
+            'source_id': DEFAULT_COUNTRY_2,
+            'target_id': DEFAULT_COUNTRY_3,
+            'cameo_code': 2, 'num_events': 3, 'num_arts': 4, 'quad_class': 5,
+        }
+
+        GdeltRecord.create_mass_records(self.engine, [record_1, record_2])
+
+        for i, repr in enumerate([record_1, record_2]):
+            exp_record = GdeltRecord(**repr)
+            obs_record = self.select_record(1+i)
+
+            self.assertEqual(exp_record, obs_record)
 
 #endregion
 
