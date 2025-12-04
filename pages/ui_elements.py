@@ -1,6 +1,8 @@
+from typing import List, Tuple
 import streamlit as st
 from lib.polars_view import PolarsView
 from lib.sql_interface import DataInterface
+from lib.sql_country import Country
 
 def init_session(session_state: 'st.session_state', db_path: str='data/example.db'):
     """ Test the current session and add keys as required, initialising to expected
@@ -36,6 +38,38 @@ def render_sidebar():
         st.page_link('pages/explore_country.py', label='Country exploration (table)')
         st.page_link('pages/visualise_longitudinal.py', label='Country exploration (graphical)')
         st.page_link('pages/visualise_spatial.py', label='Map projection of data')
+
+def render_country_import(country_list: List[Country], select_target: bool=True) -> Tuple[Country, Country]:
+    """ Draw a dynamically rendered import selection for importing a source country and optional
+        destination country from the reference database. This panel operates independentally of
+        the database content and does not access or write to the session state.
+
+        Arguments:
+        session_state -- the current st.session_state object for the streamlit instance.
+    """
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        source_country = st.selectbox(
+            'Source location',
+            country_list,
+            format_func=lambda c: c.name if c else '---',
+            help='The location from which records originate (GDELT includes both countries and continents in this category).'
+        )
+
+    if source_country and select_target:
+        with col2:
+            target_country = st.selectbox(
+                'Target location',
+                country_list,
+                format_func=lambda c: c.name if c else '---',
+                help='The location about which records are made (GDELT includes both countries and continents in this category).'
+            )
+    else:
+        target_country = None
+
+    return (source_country, target_country)
 
 def render_filter_panel(session_state: st.session_state, polars_view: PolarsView) -> None:
     """ Draw an expandable control with filter toggles to apply to a user-specified PolarsView

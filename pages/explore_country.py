@@ -4,41 +4,20 @@ from lib.sql_country import Country
 from lib.sql_gdelt_record import GdeltRecord
 from lib.polars_view import PolarsView
 
-from pages.ui_elements import init_session, render_filter_panel, render_sidebar
+from pages.ui_elements import init_session, render_country_import, render_filter_panel, render_sidebar
 from pages.ui_elements import format_column_areachart, format_column_progress
 
 # Initialise the session if required
 init_session(st.session_state)
 render_sidebar()
 
-st.markdown('# View records over time')
+st.markdown('# View records in table format')
 
 # Load the data for visualisation, adding a None padding value at the front to allow no selection
 country_list = [None] + Country.select_all(st.session_state.db_connection)
-
-col1, col2 = st.columns(2)
-
-with col1:
-    source_country = st.selectbox(
-        'Source location',
-        country_list,
-        format_func=lambda c: c.name if c else '---',
-        help='The location from which records originate (GDELT includes both countries and continents in this category).'
-    )
-
-if source_country:
-    with col2:
-        target_country = st.selectbox(
-            'Target location',
-            country_list,
-            format_func=lambda c: c.name if c else '---',
-            help='The location about which records are made (GDELT includes both countries and continents in this category).'
-        )
-else:
-    target_country = None
+source_country, target_country = render_country_import(country_list)
 
 if st.button('Import selection'):
-
     st.session_state.explore_table = GdeltRecord.select_by_country(
         st.session_state.db_connection,
         source_country,
