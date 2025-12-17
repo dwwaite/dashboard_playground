@@ -86,6 +86,7 @@ if not st.session_state.explore_table is None:
             'goldstein': format_column_areachart('Goldstein Scale'),
         }
 
+    st.divider()
     st.data_editor(
         disp_df.sort('date'),
         column_config=config_map,

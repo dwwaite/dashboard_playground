@@ -15,13 +15,21 @@ def init_session(session_state: 'st.session_state', db_path: str='data/example.d
 
     # Assume that if one key is missing, all will be.
     if not 'db_connection' in session_state:
-        session_state['db_connection'] = DataInterface.open_connection(db_path)
+        session_state.db_connection = DataInterface.open_connection(db_path)
+
+        # Initialise values for data filtering
+        session_state.min_date = None
+        session_state.max_date = None
+        session_state.num_events = None
 
         # Initialise values for the table exploration view
-        session_state['explore_table'] = None
-        session_state['min_date'] = None
-        session_state['max_date'] = None
-        session_state['num_events'] = None
+        session_state.explore_table = None
+
+        # Initialise values for the graphical events view
+        session_state.source_country = None
+        session_state.plot_table = None
+        session_state.line_color = None
+        session_state.fill_color = None
 
 #region Reusable display elements
 
@@ -81,12 +89,11 @@ def render_filter_panel(session_state: st.session_state, polars_view: PolarsView
         polars_view   -- a PolarsView object representing a set of data extracted from the SQL database
     """
 
-    with st.expander('Apply data filters!'):
+    st.divider()
+    st.markdown('**Select filters**')
 
-        st.markdown('**Date range**')
-        col_start_date, col_end_date = st.columns(2)
-
-        with col_start_date:
+    with st.container(horizontal=True):
+        with st.popover('Filter start date'):
             filt_start = st.date_input(
                 'Start date',
                 min_value=session_state.min_date,
@@ -95,7 +102,7 @@ def render_filter_panel(session_state: st.session_state, polars_view: PolarsView
             )
             polars_view.apply_filter_ge('date', filt_start)
 
-        with col_end_date:
+        with st.popover('Filter end date'):
             filt_end = st.date_input(
                 'End date',
                 min_value=session_state.min_date,
@@ -104,25 +111,22 @@ def render_filter_panel(session_state: st.session_state, polars_view: PolarsView
             )
             polars_view.apply_filter_le('date', filt_end)
 
-        st.divider()
+        with st.popover('Filter event number'):
+            max_events = st.slider(
+                'Constrain the maximum event number',
+                max_value=session_state.max_events,
+                value=session_state.max_events,
+            )
+            polars_view.apply_filter_le('num_events', max_events)
 
-        st.markdown('**Value ranges**')
-
-        max_events = st.slider(
-            'Constrain the maximum event number',
-            max_value=session_state.max_events,
-            value=session_state.max_events,
-        )
-        polars_view.apply_filter_le('num_events', max_events)
-
-        # This is a bit of a cheat, as the score is bounded between these.
-        min_goldstein, max_goldstein = st.select_slider(
-            'Constrain the Goldstein scores to report',
-            options=[i for i in range(-10, 11)],
-            value=(-10, 10)
-        )
-        polars_view.apply_filter_ge('goldstein', min_goldstein)
-        polars_view.apply_filter_le('goldstein', max_goldstein)
+        with st.popover('Filter Goldstein rage'):
+            min_goldstein, max_goldstein = st.select_slider(
+                'Constrain the Goldstein scores to report',
+                options=[i for i in range(-10, 11)],
+                value=(-10, 10)
+            )
+            polars_view.apply_filter_ge('goldstein', min_goldstein)
+            polars_view.apply_filter_le('goldstein', max_goldstein)
 
     return
 
@@ -139,8 +143,7 @@ def format_column_progress(title: str, max_value: int, width='medium') -> st.col
         width     -- (optional) change the default column width value
     """
 
-    # NEED TO REDEFINE THE MAX VALUE HERE
-
+    # NEED TO REDEFINE THE MAX VALUE HERE?
     return st.column_config.ProgressColumn(title, width=width, max_value=max_value, format='compact')
 
 def format_column_areachart(title, width='small', y_min=-10, y_max=10) -> st.column_config.AreaChartColumn:

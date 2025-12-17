@@ -114,7 +114,11 @@ class BokehViewer:
             x='date',
             source=self._event_source,
             color=tol['Iridescent'][len(self._event_stackers)],
+            legend_label=self._event_stackers,
         )
+
+        fig.legend.title = 'Target countries'
+        fig.legend.click_policy = 'mute'
 
         return fig
 
@@ -138,7 +142,7 @@ class BokehViewer:
     @staticmethod
     def transform_events(df: pl.DataFrame, top_n: int) -> pl.DataFrame:
         """ Perform required data transformation to ready the raw data for the events per country
-            plots. Where the numbe of entries is greater then the specified maximum, only the top N
+            plots. Where the number of entries is greater then the specified maximum, only the top N
             are retained and all others are condensed to a single entry.
 
             Arguments:
