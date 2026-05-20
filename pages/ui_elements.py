@@ -4,14 +4,43 @@ from lib.polars_view import PolarsView
 from lib.sql_interface import DataInterface
 from lib.sql_country import Country
 
-def init_session(session_state: 'st.session_state', db_path: str='data/example.db'):
+#region Session management
+
+@st.dialog(':material/wysiwyg: Select run mode')
+def mode_dialog():
+    """ Display a dialog to the user to select the run mode for the dashboard. This is used to
+        determine whether to run in debug mode (with a smaller dataset and faster queries) or
+        in production mode (with the full dataset and slower queries).
+
+        Arguments:
+        None
+    """
+
+    st.write(
+        'Please select whether you want to run the dashboard in debug mode (with a smaller dataset '
+        'and faster queries) or in production mode (with the full dataset and slower queries).'
+    )
+
+    selection = st.pills(
+        'Mode',
+        ['Debug' ,'Production'],
+        default='Debug',
+        selection_mode='single',
+    )
+
+    if st.button('Confirm'):
+        st.session_state.update({'run_mode': selection})
+        st.rerun()
+
+def init_session(session_state: 'st.session_state'):
     """ Test the current session and add keys as required, initialising to expected
         default values.
 
         Arguments:
         session_state -- the current st.session_state object for the streamlit instance.
-        db_path       -- (optional) the path to the GDELT data for viewing
     """
+
+    db_path = 'data/example_mini.db' if session_state.get('run_mode') == 'Debug' else 'data/example.db'
 
     # Assume that if one key is missing, all will be.
     if not 'db_connection' in session_state:
@@ -31,6 +60,8 @@ def init_session(session_state: 'st.session_state', db_path: str='data/example.d
         session_state.line_color = None
         session_state.fill_color = None
 
+#endregion
+
 #region Reusable display elements
 
 def render_sidebar():
@@ -46,6 +77,13 @@ def render_sidebar():
         st.page_link('pages/explore_country.py', label='Country exploration (table)')
         st.page_link('pages/visualise_longitudinal.py', label='Country exploration (graphical)')
         st.page_link('pages/visualise_spatial.py', label='Map projection of data')
+
+        st.markdown('---')
+        st.markdown('## Session information')
+        if st.session_state.get('run_mode') == 'Debug':
+            st.badge('Debug mode!', icon=":material/check:", color='yellow')
+        else:
+            st.badge('Production mode!', icon=":material/check:", color='green')
 
 def render_country_import(country_list: List[Country], select_target: bool=True) -> Tuple[Country, Country]:
     """ Draw a dynamically rendered import selection for importing a source country and optional
